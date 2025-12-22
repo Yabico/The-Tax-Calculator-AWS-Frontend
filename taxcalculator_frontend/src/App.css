@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+.react-select__control {
+    @apply border-gray-300 rounded-md shadow-sm;
+}
+
+.react-select__control--is-focused {
+    @apply border-indigo-500 ring-1 ring-indigo-500;
+}

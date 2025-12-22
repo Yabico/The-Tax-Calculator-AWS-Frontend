@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import type { ChangeEvent } from "react";
+import {US_STATES} from "./utils/usStates.ts";
+import Select from "react-select";
 
 interface TaxFormData {
     grossIncome: string;
@@ -19,8 +21,8 @@ interface TaxResult {
 const TaxCalculator: React.FC = () => {
     const [formData, setFormData] = useState<TaxFormData>({
         grossIncome: '',
-        state: 'CA',
-        filingStatus: 'single',
+        state: '',
+        filingStatus: '',
         itemizedDeductions: '',
         tithe: '',
         logCalculations: false
@@ -29,13 +31,6 @@ const TaxCalculator: React.FC = () => {
     const [result, setResult] = useState<TaxResult | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-
-    const states = [
-        { code: 'CA', name: 'California' },
-        { code: 'NY', name: 'New York' },
-        { code: 'TX', name: 'Texas' },
-        { code: 'FL', name: 'Florida' },
-    ];
 
     const filingStatuses = [
         { value: 'single', label: 'Single' },
@@ -94,7 +89,8 @@ const TaxCalculator: React.FC = () => {
             console.log(`Response: ${JSON.stringify(data)}`);
 
         } catch (err) {
-            // @ts-ignore
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
             setError(err.message);
             // For demo purposes, let's mock a success if backend isn't running
             // Remove this mock block in production
@@ -139,30 +135,52 @@ const TaxCalculator: React.FC = () => {
                         {/* State & Filing Status Row */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">State</label>
-                                <select
-                                    name="state"
-                                    value={formData.state}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                                >
-                                    {states.map((s) => (
-                                        <option key={s.code} value={s.code}>{s.name}</option>
-                                    ))}
-                                </select>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    State
+                                </label>
+
+                                <Select
+                                    options={US_STATES}
+                                    value={US_STATES.find(s => s.value === formData.state)}
+                                    onChange={(selectedOption) => {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            state: selectedOption?.value || "",
+                                        }));
+                                    }}
+                                    isSearchable
+                                    placeholder="Search state"
+                                    className="mt-1"
+                                    classNamePrefix="react-select"
+                                    menuPortalTarget={document.body}
+                                    menuPosition="fixed"
+                                    styles={{
+                                        menuPortal: base => ({ ...base, zIndex: 9999 }),
+                                    }}
+                                />
                             </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Status</label>
-                                <select
-                                    name="filingStatus"
-                                    value={formData.filingStatus}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                                >
-                                    {filingStatuses.map((fs) => (
-                                        <option key={fs.value} value={fs.value}>{fs.label}</option>
-                                    ))}
-                                </select>
+                                <Select
+                                    options={filingStatuses}
+                                    value={filingStatuses.find(fs => fs.value === formData.filingStatus)}
+                                    onChange={(selectedOption) => {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            filingStatus: selectedOption?.value || "",
+                                        }));
+                                    }}
+                                    isSearchable
+                                    placeholder="Select status"
+                                    className="mt-1"
+                                    classNamePrefix="react-select"
+                                    menuPortalTarget={document.body}
+                                    menuPosition="fixed"
+                                    styles={{
+                                        menuPortal: base => ({ ...base, zIndex: 9999 }),
+                                    }}
+                                />
                             </div>
                         </div>
 
