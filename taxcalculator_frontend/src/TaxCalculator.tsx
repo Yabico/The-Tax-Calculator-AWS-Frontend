@@ -4,102 +4,19 @@ import {US_STATES} from "./utils/usStates.ts";
 import Select from "react-select";
 import { motion, AnimatePresence } from "framer-motion";
 import {TaxBracketTable} from "./TaxBracketTable.tsx";
+import type {
+    TaxFormData,
+    TaxResult,
+} from "./types/TaxCalculatorTypes.ts";
 
-interface TaxFormData {
-    grossIncome: string;
-    state: string;
-    filingStatus: string;
-    itemizedDeductions: string;
-    tithe: string;
-    // logCalculations: boolean;
-}
-
-interface TaxResult {
-    totalTax: number;
-    effectiveRate: number;
-    logs?: {
-        federal: string[];
-        state: string[];
-    };
-    taxCalculations?: TaxCalculatorCalculations;
-}
-
-interface TaxCalculatorResponse {
-    totalTaxPaid: number;
-    taxCalculations: TaxCalculatorCalculations;
-
-}
-
-interface TaxBracket {
-    taxRate: number;
-    lowerBound: number;
-    upperBound: number;
-}
-
-interface TaxBracketCalculationInfo {
-    taxBracket: TaxBracket;
-    taxableIncome: number;
-    taxPaid: number;
-}
-
-interface TaxCalculationInfo {
-    taxPaid: number;
-    taxableIncome: number;
-    standardDeduction: number;
-    itemizedDeduction: number;
-    taxBracketCalculations: TaxBracketCalculationInfo[];
-}
-
-interface TaxCalculatorCalculations {
-    grossIncome: number;
-    federalTaxCalculations: TaxCalculationInfo;
-    stateTaxCalculations: TaxCalculationInfo;
-}
 const formatCurrency = (value: string) => {
     if (!value) return "";
-    const number = value.replace(/[^\d]/g, "");
+    const number = value.replace(/\D/g, "");
     return Number(number).toLocaleString();
 };
 
 const unformatCurrency = (value: string) =>
-    value.replace(/[^\d]/g, "");
-
-const buildTaxLogs = (taxCalculations: TaxCalculatorCalculations) => {
-    const federalLogs: string[] = [];
-    const stateLogs: string[] = [];
-
-    const federal = taxCalculations.federalTaxCalculations;
-    const state = taxCalculations.stateTaxCalculations;
-
-    federalLogs.push(`Federal Taxable Income: $${federal.taxableIncome.toLocaleString()}`);
-    federalLogs.push(`Standard Deduction: $${federal.standardDeduction.toLocaleString()}`);
-    federalLogs.push("");
-
-    federal.taxBracketCalculations.forEach((bracket: TaxBracketCalculationInfo) => {
-        federalLogs.push(
-            `• ${(bracket.taxBracket.taxRate * 100).toFixed(1)}% on $${bracket.taxBracket.lowerBound.toLocaleString()} – $${bracket.taxBracket.upperBound.toLocaleString()} → $${bracket.taxPaid.toLocaleString()}`
-        );
-    });
-
-    federalLogs.push("");
-    federalLogs.push(`Federal Tax Paid: $${federal.taxPaid.toLocaleString()}`);
-
-    // ---- STATE ----
-    stateLogs.push(`State Taxable Income: $${state.taxableIncome.toLocaleString()}`);
-    stateLogs.push(`Standard Deduction: $${state.standardDeduction.toLocaleString()}`);
-    stateLogs.push("");
-
-    state.taxBracketCalculations.forEach((bracket: TaxBracketCalculationInfo) => {
-        stateLogs.push(
-            `• ${(bracket.taxBracket.taxRate * 100).toFixed(2)}% on $${bracket.taxBracket.lowerBound.toLocaleString()} – $${bracket.taxBracket.upperBound.toLocaleString()} → $${bracket.taxPaid.toLocaleString()}`
-        );
-    });
-
-    stateLogs.push("");
-    stateLogs.push(`State Tax Paid: $${state.taxPaid.toLocaleString()}`);
-
-    return { federal: federalLogs, state: stateLogs };
-};
+    value.replace(/\D/g, "");
 
 const TaxCalculator: React.FC = () => {
     const [formData, setFormData] = useState<TaxFormData>({
@@ -112,11 +29,16 @@ const TaxCalculator: React.FC = () => {
     });
 
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+    const [isLogsOpen, setIsLogsOpen] = useState(false);
 
     const [result, setResult] = useState<TaxResult | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [grossIncomeDisplay, setGrossIncomeDisplay] = useState("");
+    const [itemizedDeductionsDisplay, setItemizedDeductionsDisplay] = useState("");
+
+    const canOpenLogs = Boolean(result?.taxCalculations);
+
 
     const filingStatuses = [
         { value: 'single', label: 'Single' },
@@ -358,13 +280,20 @@ const TaxCalculator: React.FC = () => {
                                             Deductions ($)
                                         </label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             name="itemizedDeductions"
-                                            min="0"
-                                            value={formData.itemizedDeductions}
-                                            onChange={handleChange}
+                                            value={itemizedDeductionsDisplay}
+                                            onChange={(e) => {
+                                                const raw = unformatCurrency(e.target.value);
+                                                setItemizedDeductionsDisplay(formatCurrency(raw));
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    itemizedDeductions: raw
+                                                }));
+                                            }}
                                             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                                            placeholder="0.00"
+                                            placeholder="e.g. 14,600"
                                         />
                                     </div>
                                     <div>
@@ -381,22 +310,9 @@ const TaxCalculator: React.FC = () => {
                                             placeholder="0.00"
                                         />
                                     </div>
-                                </div>
 
-                                {/* Log Calculations Toggle */}
-                                {/*<div className="flex items-center">*/}
-                                {/*    <input*/}
-                                {/*        id="log-calculations"*/}
-                                {/*        name="logCalculations"*/}
-                                {/*        type="checkbox"*/}
-                                {/*        checked={formData.logCalculations}*/}
-                                {/*        onChange={handleChange}*/}
-                                {/*        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-gray-700"*/}
-                                {/*    />*/}
-                                {/*    <label htmlFor="log-calculations" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">*/}
-                                {/*        Show detailed calculation logs*/}
-                                {/*    </label>*/}
-                                {/*</div>*/}
+
+                                </div>
 
                                 <button
                                     type="submit"
@@ -460,63 +376,130 @@ const TaxCalculator: React.FC = () => {
                                                      style={{width: `${Math.min(result.effectiveRate, 100)}%`}}></div>
                                             </div>
                                         </div>
-
-                                        {/* Logs Section */}
-                                        <AnimatePresence>
-                                            {result.logs && (
-                                                <motion.div
-                                                    key="logs"
-                                                    initial={{ opacity: 0, height: 0 }}
-                                                    animate={{ opacity: 1, height: "auto" }}
-                                                    exit={{ opacity: 0, height: 0 }}
-                                                    transition={{ duration: 0.3, ease: "easeOut" }}
-                                                    className="mt-6 space-y-4 overflow-hidden"
-                                                >
-                                                    {/* Federal */}
-                                                    {/*<div>*/}
-                                                    {/*    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">*/}
-                                                    {/*        Federal Tax Breakdown*/}
-                                                    {/*    </h4>*/}
-                                                    {/*    <div className="bg-gray-900 rounded-md p-3 text-green-400 font-mono text-xs whitespace-pre-wrap max-h-40 overflow-y-auto">*/}
-                                                    {/*        {result.logs.federal.join("\n")}*/}
-                                                    {/*    </div>*/}
-                                                    {/*</div>*/}
-                                                    {result?.taxCalculations?.federalTaxCalculations && (
-                                                        <>
-                                                            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
-                                                                Federal Tax Breakdown
-                                                            </h4>
-                                                            <div className="bg-gray-900 rounded-md p-3 text-green-400 font-mono text-xs whitespace-pre-wrap max-h-40 overflow-y-auto">
-                                                                <TaxBracketTable
-                                                                    brackets={
-                                                                        result.taxCalculations.federalTaxCalculations
-                                                                            .taxBracketCalculatio
-                                                                    }
-                                                                />
-                                                            </div>
-                                                        </>
-                                                    )}
-
-
-                                                    {/* State */}
-                                                    <div>
-                                                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
-                                                            State Tax Breakdown
-                                                        </h4>
-                                                        <div className="bg-gray-900 rounded-md p-3 text-green-400 font-mono text-xs whitespace-pre-wrap max-h-40 overflow-y-auto">
-                                                            {result.logs.state.join("\n")}
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-
-
                                     </motion.div>
                                 )}
+                                <button
+                                    onClick={() => setIsLogsOpen(!isLogsOpen)}
+                                    disabled={!canOpenLogs}
+                                    className={`w-full mt-2 text-sm font-medium transition-colors
+    ${
+                                        canOpenLogs
+                                            ? "text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                            : "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                                    }`}
+                                >
+                                    View calculation details
+                                </button>
+
+
                             </AnimatePresence>
                         </div>
                     </div>
+                    <AnimatePresence>
+                        {isLogsOpen && result?.taxCalculations && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                transition={{ duration: 0.35, ease: "easeOut" }}
+                                className="overflow-hidden mt-2"
+                            >
+                                <div className="h-px bg-linear-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent mb-2" />
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 border-t-0">
+
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                            Tax Calculation Details
+                                        </h3>
+                                        <button
+                                            onClick={() => setIsLogsOpen(false)}
+                                            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="p-6 space-y-6">
+                                        {/* Federal */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                                                Federal Tax Breakdown
+                                            </h4>
+                                            <div className="mb-4 grid grid-cols-3 gap-4 text-sm">
+                                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                                    <p className="text-gray-500 dark:text-gray-400">Standard Deduction</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                                        ${result.taxCalculations.federalTaxCalculations.standardDeduction.toLocaleString()}
+                                                    </p>
+                                                </div>
+
+                                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                                    <p className="text-gray-500 dark:text-gray-400">Itemized Deduction</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                                        ${result.taxCalculations.federalTaxCalculations.itemizedDeductions.toLocaleString()}
+                                                    </p>
+                                                </div>
+
+                                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                                    <p className="text-gray-500 dark:text-gray-400">Taxable Income</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                                        ${result.taxCalculations.federalTaxCalculations.taxableIncome.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <TaxBracketTable
+                                                brackets={
+                                                    result.taxCalculations.federalTaxCalculations
+                                                        .taxBracketCalculations
+                                                }
+                                                type = "Federal"
+                                            />
+                                        </div>
+
+                                        {/* State */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                                                State Tax Breakdown
+                                            </h4>
+                                            <div className="mb-4 grid grid-cols-3 gap-4 text-sm">
+                                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                                    <p className="text-gray-500 dark:text-gray-400">Standard Deduction</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                                        ${result.taxCalculations.stateTaxCalculations.standardDeduction.toLocaleString()}
+                                                    </p>
+                                                </div>
+
+                                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                                    <p className="text-gray-500 dark:text-gray-400">Itemized Deduction</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                                        ${result.taxCalculations.stateTaxCalculations.itemizedDeductions.toLocaleString()}
+                                                    </p>
+                                                </div>
+
+                                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                                    <p className="text-gray-500 dark:text-gray-400">Taxable Income</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                                        ${result.taxCalculations.stateTaxCalculations.taxableIncome.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <TaxBracketTable
+                                                brackets={
+                                                    result.taxCalculations.stateTaxCalculations
+                                                        .taxBracketCalculations
+                                                }
+                                                type = "State"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
     );
