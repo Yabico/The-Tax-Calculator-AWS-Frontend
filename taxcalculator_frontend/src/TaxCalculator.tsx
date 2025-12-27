@@ -25,7 +25,6 @@ const TaxCalculator: React.FC = () => {
         filingStatus: '',
         itemizedDeductions: '',
         tithe: '',
-        // logCalculations: false
     });
 
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
@@ -126,7 +125,6 @@ const TaxCalculator: React.FC = () => {
                 filingStatus: formData.filingStatus,
                 itemizedDeductions: parseFloat(formData.itemizedDeductions) || 0,
                 tithe: parseFloat(formData.tithe) || 0,
-                // logCalculations: formData.logCalculations,
             }
             console.log(`Request Body: ${JSON.stringify(requestBody)}`);
 
@@ -141,14 +139,9 @@ const TaxCalculator: React.FC = () => {
             if (!response.ok) throw new Error('Calculation failed. Please check inputs.');
 
             const data = await response.json();
-            // const logs = formData.logCalculations && data.taxCalculations
-            //     ? buildTaxLogs(data.taxCalculations)
-            //     : undefined;
-
             setResult({
                 totalTax: data.totalTaxPaid,
                 effectiveRate: (data.totalTaxPaid / parseFloat(formData.grossIncome)) * 100,
-                // logs,
                 taxCalculations: data.taxCalculations
             });
             console.log(`Response: ${JSON.stringify(data)}`);
