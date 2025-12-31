@@ -28,8 +28,16 @@ export interface TaxFormData {
     grossIncome: string;
     state: string;
     filingStatus: string;
-    itemizedDeductions: string;
-    tithe: string;
+    useItemizedDeductions: boolean;
+    itemized: {
+        charitableContributionsCash: string;
+        salt: string;
+        mortgageInterest: string;
+        medicalExpenses: string;
+        gamblingLosses: string;
+        investmentInterest: string;
+    };
+    totalItemizedDeductions: string;
 }
 
 export interface TaxResult {

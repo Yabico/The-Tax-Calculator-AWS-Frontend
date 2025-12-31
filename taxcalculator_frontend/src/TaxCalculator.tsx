@@ -1,30 +1,31 @@
 import React, { useState, useEffect } from "react";
-import type { ChangeEvent } from "react";
 import {US_STATES} from "./utils/usStates.ts";
 import Select from "react-select";
 import { motion, AnimatePresence } from "framer-motion";
 import {TaxBracketTable} from "./TaxBracketTable.tsx";
+import ItemizedDeductionsSection from "./itemizedDeductionsSection.tsx";
 import type {
     TaxFormData,
     TaxResult,
 } from "./types/TaxCalculatorTypes.ts";
+import {formatCurrency, unformatCurrency} from "./utils/utility.ts";
 
-const formatCurrency = (value: string) => {
-    if (!value) return "";
-    const number = value.replace(/\D/g, "");
-    return Number(number).toLocaleString();
-};
-
-const unformatCurrency = (value: string) =>
-    value.replace(/\D/g, "");
 
 const TaxCalculator: React.FC = () => {
     const [formData, setFormData] = useState<TaxFormData>({
         grossIncome: '',
         state: '',
         filingStatus: '',
-        itemizedDeductions: '',
-        tithe: '',
+        useItemizedDeductions: false,
+        itemized: {
+            charitableContributionsCash: '',
+            salt: '',
+            mortgageInterest: '',
+            medicalExpenses: '',
+            gamblingLosses: '',
+            investmentInterest: '',
+        },
+        totalItemizedDeductions: '',
     });
 
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
@@ -34,7 +35,6 @@ const TaxCalculator: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [grossIncomeDisplay, setGrossIncomeDisplay] = useState("");
-    const [itemizedDeductionsDisplay, setItemizedDeductionsDisplay] = useState("");
 
     const canOpenLogs = Boolean(result?.taxCalculations);
 
@@ -47,7 +47,7 @@ const TaxCalculator: React.FC = () => {
     ];
 
     useEffect(() => {
-        const root = document.documentElement; // <html>
+        const root = document.documentElement;
         if (isDarkMode) {
             root.classList.add("dark");
         } else {
@@ -60,8 +60,8 @@ const TaxCalculator: React.FC = () => {
             ...base,
             minHeight: "36px",
             fontSize: "0.875rem",
-            backgroundColor: isDarkMode ? "#374151" : "white", // gray-700 vs white
-            borderColor: isDarkMode ? "#4B5563" : "#D1D5DB",     // gray-600 vs gray-300
+            backgroundColor: isDarkMode ? "#374151" : "white",
+            borderColor: isDarkMode ? "#4B5563" : "#D1D5DB",
             color: isDarkMode ? "white" : "#111827",
         }),
         menu: (base: any) => ({
@@ -82,13 +82,12 @@ const TaxCalculator: React.FC = () => {
         }),
         placeholder: (base: any) => ({
             ...base,
-            color: isDarkMode ? "#9CA3AF" : "#6B7280", // gray-400 vs gray-500
+            color: isDarkMode ? "#9CA3AF" : "#6B7280",
         }),
         option: (base: any, state: { isFocused: boolean }) => ({
             ...base,
             fontSize: "0.875rem",
             padding: "6px 10px",
-            // Dark mode focus: gray-600, Light mode focus: indigo-50
             backgroundColor: state.isFocused
                 ? (isDarkMode ? "#4B5563" : "#EEF2FF")
                 : (isDarkMode ? "#374151" : "white"),
@@ -98,18 +97,6 @@ const TaxCalculator: React.FC = () => {
         menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
     };
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
-
-        const isCheckbox = type === 'checkbox';
-        const checked = isCheckbox ? (e.target as HTMLInputElement).checked : false;
-
-        setFormData((prev) => ({
-            ...prev,
-            [name]: isCheckbox ? checked : value,
-        }));
-    };
-
     const handleSubmit = async (e: { preventDefault: () => void; }) => {
         e.preventDefault();
         setLoading(true);
@@ -117,14 +104,11 @@ const TaxCalculator: React.FC = () => {
         setResult(null);
 
         try {
-            // 4. API Integration with Java Backend
-            // Replace with your actual Java Controller Endpoint
             const requestBody = {
                 grossIncome: parseFloat(formData.grossIncome) || 0,
                 state: formData.state,
                 filingStatus: formData.filingStatus,
-                itemizedDeductions: parseFloat(formData.itemizedDeductions) || 0,
-                tithe: parseFloat(formData.tithe) || 0,
+                itemizedDeductions: parseFloat(formData.totalItemizedDeductions) || 0,
             }
             console.log(`Request Body: ${JSON.stringify(requestBody)}`);
 
@@ -150,12 +134,42 @@ const TaxCalculator: React.FC = () => {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-expect-error
             setError(err.message);
-            // For demo purposes, let's mock a success if backend isn't running
-            // Remove this mock block in production
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (!formData.useItemizedDeductions) {
+            setFormData(prev => ({
+                ...prev,
+                totalItemizedDeductions: "0",
+            }));
+            return;
+        }
+
+        const {
+            charitableContributionsCash,
+            salt,
+            mortgageInterest,
+            medicalExpenses,
+            gamblingLosses,
+            investmentInterest,
+        } = formData.itemized;
+
+        const total =
+            (parseFloat(charitableContributionsCash) || 0) +
+            (parseFloat(salt) || 0) +
+            (parseFloat(mortgageInterest) || 0) +
+            (parseFloat(medicalExpenses) || 0) +
+            (parseFloat(gamblingLosses) || 0) +
+            (parseFloat(investmentInterest) || 0);
+
+        setFormData(prev => ({
+            ...prev,
+            totalItemizedDeductions: total.toString(),
+        }));
+    }, [formData.itemized, formData.useItemizedDeductions]);
 
     return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
@@ -266,46 +280,51 @@ const TaxCalculator: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Deductions & Tithe Row */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Deductions ($)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            name="itemizedDeductions"
-                                            value={itemizedDeductionsDisplay}
-                                            onChange={(e) => {
-                                                const raw = unformatCurrency(e.target.value);
-                                                setItemizedDeductionsDisplay(formatCurrency(raw));
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    itemizedDeductions: raw
-                                                }));
-                                            }}
-                                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                                            placeholder="e.g. 14,600"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Tithe ($)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            name="tithe"
-                                            min="0"
-                                            value={formData.tithe}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Add Itemized Deductions
+                                    </label>
+                                    <input
+                                        type="checkbox"
 
-
+                                        checked={formData.useItemizedDeductions}
+                                        onChange={(e) =>
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                useItemizedDeductions: e.target.checked,
+                                            }))
+                                        }
+                                        className="h-4 w-4"
+                                    />
                                 </div>
+
+                                <AnimatePresence>
+                                    {formData.useItemizedDeductions && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: "auto" }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="space-y-4"
+                                        >
+                                            {/* Itemized fields go here */}
+                                            <ItemizedDeductionsSection
+                                                agi={Number(formData.grossIncome) || 0}
+                                                itemized={formData.itemized}
+                                                onChange={(field, value) =>
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        itemized: {
+                                                            ...prev.itemized,
+                                                            [field]: value,
+                                                        },
+                                                    }))
+                                                }
+                                            />
+
+
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
 
                                 <button
                                     type="submit"
@@ -494,6 +513,14 @@ const TaxCalculator: React.FC = () => {
                         )}
                     </AnimatePresence>
                 </div>
+                <footer className="mt-16 border-t border-gray-200 dark:border-gray-700 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <p className="max-w-3xl mx-auto px-4">
+                        <span className="font-semibold">Disclaimer:</span> This tool is for educational and informational purposes only.
+                        We have no idea what we're doing — so if you use this as a reference for any legal, financial, or tax decisions,
+                        you’re <span className="italic">definitely cooked</span>.
+                    </p>
+                </footer>
+
             </div>
     );
 };
