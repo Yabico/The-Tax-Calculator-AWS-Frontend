@@ -112,7 +112,7 @@ const TaxCalculator: React.FC = () => {
             }
             console.log(`Request Body: ${JSON.stringify(requestBody)}`);
 
-            const response = await fetch('https://muwucpnoz6.execute-api.us-east-1.amazonaws.com/gamma/calculate-tax', {
+            const response = await fetch('https://11h669fe37.execute-api.us-east-1.amazonaws.com/gamma/calculate-tax', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
